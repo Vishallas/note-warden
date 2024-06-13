@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Example</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+
+<body>
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">Upload</button>
+    <button onclick="deleteFile()">Delete</button>
+    <button onclick="getFile()">Get</button>
+    <div id="result"></div>
+    <div id="content"></div>
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const key = prompt("Please enter your file name:");
+
+            if (!file || !key) {
+                alert("Please select a file and enter a file name.");
+                return;
+            }
+
+            async function fetchProtectedData(key) {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    localStorage.setItem("isAuthenticated", false);
+                    alert('No token found. Please log in.');
+
+                    return;
+                }
+                try {
+                    const response = await axios.post('http://localhost:3000/presigneduploadurl', { key }, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    return response.data.onetimeurl;
+                } catch (error) {
+                    if (response.data.message === 'Invalid token') {
+                        localStorage.setItem("isAuthenticated", false);
+                        console.error('Invalid Token or Token expired !');
+                    } else {
+                        console.error('Error fetching data', error);
+                        alert("Failed to get the pre-signed URL.");
+                    }
+                }
+            }
+
+            try {
+                const url = await fetchProtectedData(key);
+                if (!url) {
+                    return;
+                }
+
+                const uploadResponse = fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': new Blob([file]).size
+                    },
+                    body: file
+                }).then(res => {
+                    console.log(res.ok);
+                    if (res.ok) {
+                        alert("File uploaded successfully!");
+                    } else {
+                        alert("File upload failed.");
+                    }
+                }).catch(err => console.error(err));
+
+            } catch (error) {
+                console.error('Error uploading file', error);
+                alert("An error occurred during file upload.");
+            }
+        }
+
+        // Function to log in and store the token
+        async function login() {
+            const response = await axios.post('http://localhost:3000/signin', {
+                username: 'vishal',
+                password: 'Hello@123'
+            });
+            const token = response.data.token;
+            localStorage.setItem('authToken', token);
+            alert('Logged in successfully');
+        }
+
+        // Check if user is signed in
+        const isAuthenticated = localStorage.getItem("isAuthenticated");
+
+        if (!isAuthenticated) {
+            // If not signed in, redirect to sign-in page
+            window.location.href = "index.html";
+        }
+        // Example usage
+        // login().then(fetchProtectedData);
+    </script>
+</body>
+
+</html>
